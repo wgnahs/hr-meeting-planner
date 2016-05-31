@@ -22,6 +22,7 @@ $app['swiftmailer.options'] = array(
     'port' => 465,
     'username' => 'xxxxx',
     'password' => 'xxxxx',
+    'from' => 'xxxxx',
     'transport' => 'smtp',
     'encryption' => 'ssl',
     'auth_mode' => null
