@@ -2,11 +2,9 @@
 
 require __DIR__.'/../vendor/autoload.php';
 
-use Knp\Provider\ConsoleServiceProvider;
-
 $app = new \Silex\Application();
 
-$app->register(new ConsoleServiceProvider(), [
+$app->register(new Knp\Provider\ConsoleServiceProvider(), [
     'console.name'              => 'HR Meeting planner',
     'console.version'           => '1.0.0',
     'console.project_directory' => __DIR__.'/../'
