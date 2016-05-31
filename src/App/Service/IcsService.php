@@ -12,7 +12,7 @@ use Jsvrcek\ICS\CalendarExport;
 
 class IcsService
 {
-    public static function generateAttachment($emailAddressEmployee, $emailAddressHr, $date, $meetingTitle)
+    public function generateAttachment($emailAddressEmployee, $emailAddressHr, $date, $meetingTitle)
     {
         $eventOne = new CalendarEvent();
         $eventOne->setStart(new \DateTime($date, new \DateTimeZone('Europe/Amsterdam')))
