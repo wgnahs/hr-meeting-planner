@@ -44,7 +44,7 @@ class ReadCsvCommand extends Command
             throw new \Exception('Folder not found! Make sure you have a folder created at: '.$dir);
         }
 
-        // Scan for files, built it in a private function to prevent a mess
+        // Scan for files
         $files = $handleCsv->scanForFiles($dir);
         if(!count($files))
         {
