@@ -3,20 +3,14 @@
 namespace App\Command;
 
 use Knp\Command\Command;
+
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 
-use Jsvrcek\ICS\Model\Calendar;
-use Jsvrcek\ICS\Model\CalendarEvent;
-use Jsvrcek\ICS\Model\Relationship\Attendee;
-use Jsvrcek\ICS\Model\Relationship\Organizer;
-use Jsvrcek\ICS\Utility\Formatter;
-use Jsvrcek\ICS\CalendarStream;
-use Jsvrcek\ICS\CalendarExport;
-
-use Ddeboer\DataImport\Reader;
+use App\Service\CsvHandlerService;
+use App\Service\IcsService;
 
 class ReadCsvCommand extends Command
 {
@@ -39,6 +33,7 @@ class ReadCsvCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $app = $this->getSilexApplication();
+        $handleCsv = new CsvHandlerService();
 
         $output->writeln('<info>Reading folder..</info>');
 
@@ -50,7 +45,7 @@ class ReadCsvCommand extends Command
         }
 
         // Scan for files, built it in a private function to prevent a mess
-        $files = $this->scanForFiles($dir);
+        $files = $handleCsv->scanForFiles($dir);
         if(!count($files))
         {
             return $output->writeln('<comment>No files to process, are you sure it\'s located at: '.$dir.'?</comment>');
@@ -65,18 +60,10 @@ class ReadCsvCommand extends Command
         {
             $output->writeln('<fg=black;bg=cyan>Current file: '.$file.'</>');
 
-            // We need a full path for the SplFileObject
+            // We need a full path for the handler
             $fullPath = $dir.$file;
 
-            // The CSV reader requires a SplFileObject
-            $csv = new \SplFileObject($fullPath);
-
-            // Auto detect the delimiter
-            $delimiter = $this->getFileDelimiter($fullPath);
-
-            // Convert CSV data to an array
-            $reader = new Reader\CsvReader($csv, $delimiter);
-            $reader->setHeaderRowNumber(0);
+            $reader = $handleCsv->getRows($fullPath);
 
             // We're going to use this to generate a nice view to verify the data
             $table = new Table($output);
@@ -130,16 +117,19 @@ class ReadCsvCommand extends Command
                 $salaryMeetingDate = $this->getWeekdayDate(date('d-m-Y', strtotime($salaryMeeting)));
                 $output->writeln('Planning salary meeting on <options=bold>'.$salaryMeetingDate.'</>, going to send an invitation'."\n\n");
 
+                $icsService = new IcsService();
+
                 // Set up an calendar event
-                $contractAttachment = $this->generateIcsAttachment($emailAddressEmployee, $emailAddressHr, $contractMeetingDate, 'Contractbespreking');
-                $salaryAttachment = $this->generateIcsAttachment($emailAddressEmployee, $emailAddressHr, $salaryMeetingDate, 'Salarisbespreking');
+                $contractAttachment = $icsService->generateAttachment($emailAddressEmployee, $emailAddressHr, $contractMeetingDate, 'Contractbespreking');
+                $salaryAttachment = $icsService->generateAttachment($emailAddressEmployee, $emailAddressHr, $salaryMeetingDate, 'Salarisbespreking');
 
                 // Send an e-mail to attendee (employee) and organizer (HR)
                 $message = \Swift_Message::newInstance()
                     ->setSubject('HR bespreking')
                     ->setFrom($app['swiftmailer.options']['from'])
-                    ->setTo($emailAddressEmployee)
-                    ->setCc($emailAddressHr)
+//                    ->setTo($emailAddressEmployee)
+//                    ->setCc($emailAddressHr)
+                        ->setTo('admin@innovato.email')
                     ->setBody(
                         $app['twig']->render(
                             'Emails/planned_meeting.html.twig',
@@ -161,101 +151,6 @@ class ReadCsvCommand extends Command
             // Rename the file so we won't have to process it again
             rename($fullPath, $dir.'processed_'.$file);
         }
-    }
-
-    private function generateIcsAttachment($emailAddressEmployee, $emailAddressHr, $date, $meetingTitle)
-    {
-        $eventOne = new CalendarEvent();
-        $eventOne->setStart(new \DateTime($date, new \DateTimeZone('Europe/Amsterdam')))
-            ->setSummary('')
-            ->setUid('event-uid');
-
-        $attendee = new Attendee(new Formatter());
-        $attendee->setValue($emailAddressEmployee);
-        $eventOne->addAttendee($attendee);
-
-        $organizer = new Organizer(new Formatter());
-        $organizer->setValue($emailAddressHr);
-        $eventOne->setOrganizer($organizer);
-
-        $calendar = new Calendar();
-        $calendar->setProdId('-//Een bedrijf//NL')->addEvent($eventOne);
-
-        $calendarExport = new CalendarExport(new CalendarStream, new Formatter());
-        $calendarExport->addCalendar($calendar);
-
-        $attachment = \Swift_Attachment::newInstance()
-            ->setFilename($meetingTitle.'.ics')
-            ->setContentType('text/calendar')
-            ->setBody($calendarExport->getStream());
-
-        return $attachment;
-    }
-
-    private function scanForFiles($files)
-    {
-        $return = [];
-
-        if($handle = opendir($files))
-        {
-            while(false !== ($entry = readdir($handle)))
-            {
-                // Filter out stuff we don't need, including processed files
-                if($entry != ".." && substr($entry, 0, 1) != '.' && !strstr($entry, 'processed_'))
-                {
-                    $return[] = $entry;
-                }
-            }
-
-            closedir($handle);
-        }
-
-        return $return;
-    }
-
-    private function getFileDelimiter($fullPath)
-    {
-        $file = new \SplFileObject($fullPath);
-
-        $delimiters = [
-            ',',
-            '\t',
-            ';',
-            '|',
-            ':'
-        ];
-
-        $results = [];
-        $i = 0;
-
-        while($file->valid() && $i <= 2)
-        {
-            $line = $file->fgets();
-
-            foreach($delimiters as $delimiter)
-            {
-                $regExp = '/['.$delimiter.']/';
-                $fields = preg_split($regExp, $line);
-
-                if(count($fields) > 1)
-                {
-                    if(!empty($results[$delimiter]))
-                    {
-                        $results[$delimiter]++;
-                    }
-                    else
-                    {
-                        $results[$delimiter] = 1;
-                    }
-                }
-            }
-
-            $i++;
-        }
-
-        $results = array_keys($results, max($results));
-
-        return $results[0];
     }
 
     private function getWeekdayDate($date)
