@@ -76,25 +76,16 @@ class ReadCsvCommand extends Command
 
             // Convert CSV data to an array
             $reader = new Reader\CsvReader($csv, $delimiter);
+            $reader->setHeaderRowNumber(0);
 
             // We're going to use this to generate a nice view to verify the data
             $table = new Table($output);
 
-            $skipHeaders = true;
+            $table->setHeaders($this->csvHeaders);
 
-            foreach($reader as $row)
+            foreach($reader as $value)
             {
-                // We won't need the headers, we're using the our headers to match it
-                if($skipHeaders)
-                {
-                    $table->setHeaders($this->csvHeaders);
-                    $skipHeaders = false;
-                }
-                else
-                {
-                    // Add a row to the table
-                    $table->addRow($row);
-                }
+                $table->addRow($value);
             }
 
             // Let's render the table!
@@ -114,14 +105,8 @@ class ReadCsvCommand extends Command
             // Going to for each again so we can individually invite everyone
             foreach($reader as $row)
             {
-                // We won't need the headers, we're using the our headers to match it
-                if($skipHeaders)
-                {
-                    $skipHeaders = false;
-
-                    continue;
-                }
-
+                $row = array_values($row);
+                
                 $name = $row[0];
                 $emailAddressEmployee = $row[1];
                 $emailAddressHr = $row[2];
