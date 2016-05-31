@@ -127,9 +127,8 @@ class ReadCsvCommand extends Command
                 $message = \Swift_Message::newInstance()
                     ->setSubject('HR bespreking')
                     ->setFrom($app['swiftmailer.options']['from'])
-//                    ->setTo($emailAddressEmployee)
-//                    ->setCc($emailAddressHr)
-                        ->setTo('admin@innovato.email')
+                    ->setTo($emailAddressEmployee)
+                    ->setCc($emailAddressHr)
                     ->setBody(
                         $app['twig']->render(
                             'Emails/planned_meeting.html.twig',
