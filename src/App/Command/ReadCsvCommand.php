@@ -119,7 +119,7 @@ class ReadCsvCommand extends Command
 
                 $icsService = new IcsService();
 
-                // Set up an calendar event
+                // Set up a calendar event
                 $contractAttachment = $icsService->generateAttachment($emailAddressEmployee, $emailAddressHr, $contractMeetingDate, 'Contractbespreking');
                 $salaryAttachment = $icsService->generateAttachment($emailAddressEmployee, $emailAddressHr, $salaryMeetingDate, 'Salarisbespreking');
 
